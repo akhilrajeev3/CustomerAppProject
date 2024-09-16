@@ -1,0 +1,185 @@
+﻿@page "/customers"
+@using CustomerBlazorApp.Data
+@using CustomerBlazorApp.Models
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+
+<h3>Customer List</h3>
+
+<div class="search-section">
+    <input @bind="searchText" class="form-control search-input" placeholder="Search by name" />
+    <button @onclick="SearchCustomers" class="btn btn-primary search-button">Search</button>
+</div>
+
+<style>
+    .search-section {
+        margin-bottom: 20px;
+    }
+
+    .search-input {
+        display: inline-block;
+        width: auto;
+        margin-right: 10px;
+    }
+
+    .search-button {
+        display: inline-block;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-buttons {
+        margin-top: 10px;
+    }
+
+    .edit-section {
+        margin-top: 20px;
+    }
+
+    .table {
+        margin-top: 20px;
+    }
+</style>
+
+<!-- Table to list customers -->
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Id</th>
+            <th>Name</th>
+            <th>SSN</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var customer in filteredCustomers)
+        {
+            <tr>
+                <td>@customer.Id</td>
+                <td>@customer.Name</td>
+                <td>@customer.SSN</td>
+                <td>
+                    <button @onclick="() => EditCustomer(customer.Id)" class="btn btn-warning btn-sm">Edit</button>
+                    <button @onclick="() => DeleteCustomer(customer.Id)" class="btn btn-danger btn-sm">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<!-- Section for Adding a New Customer -->
+<h3>Add New Customer</h3>
+<EditForm Model="newCustomer" OnValidSubmit="SaveNewCustomer">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <div class="form-group">
+        <label for="newName">Name:</label>
+        <InputText @bind-Value="newCustomer.Name" class="form-control" id="newName" />
+    </div>
+    <div class="form-group">
+        <label for="newSSN">SSN:</label>
+        <InputText @bind-Value="newCustomer.SSN" class="form-control" id="newSSN" />
+    </div>
+    <button type="submit" class="btn btn-success">Add</button>
+</EditForm>
+
+<!-- Section for Editing an Existing Customer (only shows when editing) -->
+@if (isEditVisible)
+{
+    <div class="edit-section">
+        <h3>Edit Customer</h3>
+        <EditForm Model="currentCustomer" OnValidSubmit="SaveEditCustomer">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="form-group">
+                <label for="editName">Name:</label>
+                <InputText @bind-Value="currentCustomer.Name" class="form-control" id="editName" />
+            </div>
+            <div class="form-group">
+                <label for="editSSN">SSN:</label>
+                <InputText @bind-Value="currentCustomer.SSN" class="form-control" id="editSSN" />
+            </div>
+            <div class="form-buttons">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <button type="button" @onclick="ClearEditForm" class="btn btn-secondary">Cancel</button>
+            </div>
+        </EditForm>
+    </div>
+}
+
+@code {
+    // New customer model for adding a customer
+    private CustomerBlazorApp.Models.Customer newCustomer = new CustomerBlazorApp.Models.Customer();
+
+    // Current customer being edited
+    private CustomerBlazorApp.Models.Customer currentCustomer = new CustomerBlazorApp.Models.Customer();
+
+    // State to toggle the visibility of the edit form
+    private bool isEditVisible = false;
+
+    // Customer list and search functionality
+    private string searchText = string.Empty;
+    private List<CustomerBlazorApp.Models.Customer> customers = new List<CustomerBlazorApp.Models.Customer>();
+
+    // Initialization: Fetch customer data on load
+    protected override async Task OnInitializedAsync()
+    {
+        customers = await DbContext.Customer.ToListAsync();
+    }
+
+    private IEnumerable<CustomerBlazorApp.Models.Customer> filteredCustomers =>
+        customers.Where(c => c.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+
+    // Search functionality
+    private async Task SearchCustomers()
+    {
+        customers = await DbContext.Customer.Where(c => c.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToListAsync();
+    }
+
+    // Add a new customer
+    private async Task SaveNewCustomer()
+    {
+        DbContext.Customer.Add(newCustomer);
+        await DbContext.SaveChangesAsync();
+        customers = await DbContext.Customer.ToListAsync();
+        newCustomer = new CustomerBlazorApp.Models.Customer(); // Reset form for new entry
+    }
+
+    // Show edit form when "Edit" is clicked
+    private async Task EditCustomer(int id)
+    {
+        currentCustomer = await DbContext.Customer.FindAsync(id);
+        isEditVisible = true;
+        StateHasChanged(); // Trigger UI refresh
+    }
+
+    // Save the edited customer
+    private async Task SaveEditCustomer()
+    {
+        DbContext.Customer.Update(currentCustomer);
+        await DbContext.SaveChangesAsync();
+        customers = await DbContext.Customer.ToListAsync();
+        ClearEditForm(); // Reset and hide the edit form
+    }
+
+    // Clear the edit form and hide it
+    private void ClearEditForm()
+    {
+        currentCustomer = new CustomerBlazorApp.Models.Customer();
+        isEditVisible = false;
+    }
+
+    // Delete customer functionality
+    private async Task DeleteCustomer(int id)
+    {
+        var customer = await DbContext.Customer.FindAsync(id);
+        if (customer != null)
+        {
+            DbContext.Customer.Remove(customer);
+            await DbContext.SaveChangesAsync();
+            customers.Remove(customer);
+        }
+    }
+}
